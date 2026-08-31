@@ -1,0 +1,98 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "type": "line", "name": "S1线", "color": "#4f8ef7" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [121.3285, 28.6521],
+          [121.3580, 28.6612],
+          [121.3820, 28.6698],
+          [121.4050, 28.6750],
+          [121.4280, 28.6790],
+          [121.4520, 28.6820],
+          [121.4780, 28.6835],
+          [121.5030, 28.6820],
+          [121.5280, 28.6780],
+          [121.5510, 28.6720],
+          [121.5720, 28.6640],
+          [121.5900, 28.6540],
+          [121.6050, 28.6420],
+          [121.6200, 28.6280]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "1", "name": "台州站", "code": "TZZ", "order": 1 },
+      "geometry": { "type": "Point", "coordinates": [121.3285, 28.6521] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "2", "name": "天台路站", "code": "TTL", "order": 2 },
+      "geometry": { "type": "Point", "coordinates": [121.3580, 28.6612] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "3", "name": "市政府站", "code": "SZF", "order": 3 },
+      "geometry": { "type": "Point", "coordinates": [121.3820, 28.6698] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "4", "name": "文化路站", "code": "WHL", "order": 4 },
+      "geometry": { "type": "Point", "coordinates": [121.4050, 28.6750] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "5", "name": "商业中心站", "code": "SYZ", "order": 5 },
+      "geometry": { "type": "Point", "coordinates": [121.4280, 28.6790] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "6", "name": "万达广场站", "code": "WDG", "order": 6 },
+      "geometry": { "type": "Point", "coordinates": [121.4520, 28.6820] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "7", "name": "路桥北站", "code": "LQB", "order": 7 },
+      "geometry": { "type": "Point", "coordinates": [121.4780, 28.6835] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "8", "name": "路桥站", "code": "LQZ", "order": 8 },
+      "geometry": { "type": "Point", "coordinates": [121.5030, 28.6820] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "9", "name": "新桥站", "code": "XQZ", "order": 9 },
+      "geometry": { "type": "Point", "coordinates": [121.5280, 28.6780] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "10", "name": "黄岩北站", "code": "HYB", "order": 10 },
+      "geometry": { "type": "Point", "coordinates": [121.5510, 28.6720] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "11", "name": "黄岩站", "code": "HYZ", "order": 11 },
+      "geometry": { "type": "Point", "coordinates": [121.5720, 28.6640] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "12", "name": "椒江站", "code": "JJZ", "order": 12 },
+      "geometry": { "type": "Point", "coordinates": [121.5900, 28.6540] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "13", "name": "台州东站", "code": "TZD", "order": 13 },
+      "geometry": { "type": "Point", "coordinates": [121.6050, 28.6420] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "type": "station", "id": "14", "name": "客运中心站", "code": "KYZ", "order": 14 },
+      "geometry": { "type": "Point", "coordinates": [121.6200, 28.6280] }
+    }
+  ]
+}
