@@ -4,7 +4,7 @@ import { LINE_SEGMENTS, STATIONS } from '@/data/stations'
 import { genAccData } from '@/data/mockData'
 import { parseLineGeoJSON } from '@/utils/geojson'
 
-export type MapBasemap = 'normal' | 'dark' | 'satellite'
+export type MapBasemap = 'normal' | 'satellite'
 
 interface ToastState {
   id: number
@@ -73,7 +73,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   accData: genAccData(),
   loading: false,
-  mapBasemap: 'dark',
+  mapBasemap: 'normal',
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   customGeoJSON: null,

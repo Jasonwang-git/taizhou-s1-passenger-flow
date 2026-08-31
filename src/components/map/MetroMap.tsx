@@ -11,12 +11,10 @@ const MAP_CENTER: [number, number] = [121.36, 28.48]
 
 const MAP_STYLES: Record<Exclude<MapBasemap, 'satellite'>, string> = {
   normal: 'amap://styles/normal',
-  dark: 'amap://styles/darkblue',
 }
 
 const BASEMAP_OPTIONS: { key: MapBasemap; label: string }[] = [
   { key: 'normal', label: '标准' },
-  { key: 'dark', label: '深色' },
   { key: 'satellite', label: '卫星' },
 ]
 
