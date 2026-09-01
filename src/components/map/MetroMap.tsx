@@ -37,7 +37,7 @@ function markerHtml(station: Station, selected: boolean, inSection: boolean) {
   `
 }
 
-export default function MetroMap() {
+export default function MetroMap({ onReady }: { onReady?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<AMapMap | null>(null)
   const AMapRef = useRef<AMapNamespace | null>(null)
@@ -46,10 +46,12 @@ export default function MetroMap() {
   const polylinesRef = useRef<AMapPolyline[]>([])
   const markersRef = useRef<AMapMarker[]>([])
   const fitViewKeyRef = useRef('')
+  const readyNotifiedRef = useRef(false)
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'nokey' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
   const [loadingOsm, setLoadingOsm] = useState(true)
+  const [mapPainted, setMapPainted] = useState(false)
 
   const selectedId = useAppStore((s) => s.selectedStationId)
   const sectionIds = useAppStore((s) => s.sectionStationIds)
@@ -108,6 +110,7 @@ export default function MetroMap() {
     if (security) window._AMapSecurityConfig = { securityJsCode: security }
 
     let cancelled = false
+    let revealTimer = 0
     AMapLoader.load({ key, version: '2.0', plugins: [] })
       .then((AMap) => {
         if (cancelled || !containerRef.current) return
@@ -128,6 +131,15 @@ export default function MetroMap() {
           pitchEnable: false,
         })
         mapRef.current = map
+
+        const reveal = () => {
+          if (cancelled) return
+          setMapPainted(true)
+        }
+        // complete：底图渲染完成后再露出，避免灰底闪一下
+        map.on('complete', reveal)
+        revealTimer = window.setTimeout(reveal, 2500)
+
         requestAnimationFrame(() => map.resize())
         setTimeout(() => map.resize(), 200)
         setStatus('ready')
@@ -139,11 +151,28 @@ export default function MetroMap() {
 
     return () => {
       cancelled = true
+      window.clearTimeout(revealTimer)
       mapRef.current?.destroy()
       mapRef.current = null
       AMapRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    if (readyNotifiedRef.current) return
+    const terminal = status === 'nokey' || status === 'error'
+    const mapOk = status === 'ready' && mapPainted
+    if (!terminal && !mapOk) return
+    if (!terminal && loadingOsm) return
+
+    const timer = window.setTimeout(() => {
+      if (readyNotifiedRef.current) return
+      readyNotifiedRef.current = true
+      onReady?.()
+    }, terminal ? 0 : 350)
+
+    return () => window.clearTimeout(timer)
+  }, [status, mapPainted, loadingOsm, onReady])
 
   useEffect(() => {
     const el = containerRef.current
@@ -152,6 +181,8 @@ export default function MetroMap() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  const basemapSyncedRef = useRef(false)
 
   useEffect(() => {
     const map = mapRef.current
@@ -164,10 +195,15 @@ export default function MetroMap() {
       }
       satelliteRef.current.setMap(map)
       roadNetRef.current?.setMap(map)
+      basemapSyncedRef.current = true
     } else {
       satelliteRef.current?.setMap(null)
       roadNetRef.current?.setMap(null)
-      map.setMapStyle(MAP_STYLES[mapBasemap])
+      // 创建时已设 normal，跳过首次重复 setMapStyle，避免样式重载闪白/闪深
+      if (basemapSyncedRef.current) {
+        map.setMapStyle(MAP_STYLES[mapBasemap])
+      }
+      basemapSyncedRef.current = true
     }
   }, [mapBasemap, status])
 
@@ -246,7 +282,7 @@ export default function MetroMap() {
   }, [status, dataKey, linePaths, stations, selectedId, sectionIds, setSelectedStation, viewMode, mapLineVisible])
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full bg-[#020814]">
       <div ref={containerRef} className="amap-host h-full w-full" />
 
       {status === 'nokey' && (
@@ -254,11 +290,6 @@ export default function MetroMap() {
           <div className="pointer-events-auto max-w-md rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 text-center shadow-panel">
             <h3 className="text-base font-semibold text-cyan-300">等待配置高德 Key</h3>
           </div>
-        </div>
-      )}
-      {status === 'loading' && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-950/60 text-sm text-cyan-300">
-          高德地图加载中…
         </div>
       )}
       {status === 'error' && (
