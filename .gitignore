@@ -35,8 +35,9 @@ backend/__pycache__/
 .pytest_cache/
 
 # 原始大文件（本地保留，勿提交 GitHub）
-数据/*.xlsx
-数据/*.xls
+数据/*
+!数据/.gitkeep
 *.xlsx
 *.xls
+*.docx
 backend/data/json/acc_trips.json
