@@ -152,25 +152,33 @@ export function SectionChart({ height = 180 }: { height?: number }) {
 export function PredictionChart({
   height = 180,
   showCorrection = false,
+  data: external,
 }: {
   height?: number
   showCorrection?: boolean
+  data?: {
+    dates: string[]
+    actual: number[]
+    predicted: number[]
+    corrected: number[]
+  } | null
 }) {
   const filter = useAppStore((s) => s.filter)
   const selectedId = useAppStore((s) => s.selectedStationId)
   const segmentId = useAppStore((s) => s.sectionSegmentId)
-  const data = useMemo(
+  const fallback = useMemo(
     () =>
       genPredictionData(filter, {
         stationId: selectedId,
         segmentId,
-        days: 7,
       }),
     [filter, selectedId, segmentId],
   )
+  const data = external ?? fallback
   const legend = showCorrection ? ['实际', '预测', '校正后'] : ['实际', '预测']
+  const peak = Math.max(...data.predicted, ...data.actual, 1)
   const yFmt =
-    filter.predictScope === 'line'
+    filter.predictScope === 'line' && peak >= 10000
       ? (v: number) => `${(v / 10000).toFixed(0)}万`
       : (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))
 
@@ -187,7 +195,12 @@ export function PredictionChart({
     xAxis: {
       type: 'category',
       data: data.dates,
-      axisLabel: { fontSize: 9, color: '#64748b' },
+      axisLabel: {
+        fontSize: 9,
+        color: '#64748b',
+        rotate: data.dates.length > 18 ? 35 : 0,
+        interval: data.dates.length > 40 ? Math.floor(data.dates.length / 12) : 0,
+      },
       axisLine: { lineStyle: { color: '#334155' } },
     },
     yAxis: {

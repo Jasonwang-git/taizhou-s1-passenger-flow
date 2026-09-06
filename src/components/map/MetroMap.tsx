@@ -13,11 +13,6 @@ const MAP_STYLES: Record<Exclude<MapBasemap, 'satellite'>, string> = {
   normal: 'amap://styles/normal',
 }
 
-const BASEMAP_OPTIONS: { key: MapBasemap; label: string }[] = [
-  { key: 'normal', label: '标准' },
-  { key: 'satellite', label: '卫星' },
-]
-
 const COVER_LINE = {
   strokeColor: '#1E90FF',
   strokeWeight: 8,
@@ -29,10 +24,11 @@ function markerHtml(station: Station, selected: boolean, inSection: boolean) {
   const dotClass = [selected ? 'active' : '', inSection ? 'in-section' : '']
     .filter(Boolean)
     .join(' ')
+  const showLabel = selected || inSection
   return `
-    <div class="amap-station">
+    <div class="amap-station" title="${station.name}">
       <div class="station-dot ${dotClass}"></div>
-      <span class="station-label ${selected ? 'active' : ''}">${station.name}</span>
+      ${showLabel ? `<span class="station-label ${selected ? 'active' : ''}">${station.name}</span>` : ''}
     </div>
   `
 }
@@ -59,7 +55,6 @@ export default function MetroMap({ onReady }: { onReady?: () => void }) {
   const mapBasemap = useAppStore((s) => s.mapBasemap)
   const mapLineVisible = useAppStore((s) => s.mapLineVisible)
   const stationSearch = useAppStore((s) => s.stationSearch)
-  const setMapBasemap = useAppStore((s) => s.setMapBasemap)
   const setSelectedStation = useAppStore((s) => s.setSelectedStation)
   const setMapLineVisible = useAppStore((s) => s.setMapLineVisible)
   const importGeoJSON = useAppStore((s) => s.importGeoJSON)
@@ -277,7 +272,7 @@ export default function MetroMap({ onReady }: { onReady?: () => void }) {
 
     if (overlays.length > 0 && fitViewKeyRef.current !== dataKey) {
       fitViewKeyRef.current = dataKey
-      map.setFitView(overlays, false, [60, 60, 60, 60])
+      map.setFitView(overlays, false, [80, 80, 100, 80])
     }
   }, [status, dataKey, linePaths, stations, selectedId, sectionIds, setSelectedStation, viewMode, mapLineVisible])
 
@@ -301,33 +296,6 @@ export default function MetroMap({ onReady }: { onReady?: () => void }) {
         </div>
       )}
 
-      {status === 'ready' && (
-        <div className="pointer-events-none absolute inset-0 z-10">
-          <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 gap-1">
-            <div className="hud-panel flex gap-1 p-1">
-              {BASEMAP_OPTIONS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`chip-btn ${mapBasemap === key ? 'active' : ''}`}
-                  onClick={() => setMapBasemap(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="hud-panel px-3 py-1.5 text-[10px] text-slate-400">
-              <span className="mr-2 inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-6 rounded bg-[#1E90FF] shadow-[0_0_8px_#1E90FF]" /> S1 覆盖线
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-                {loadingOsm ? '加载中…' : `${stations.length} 站`}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

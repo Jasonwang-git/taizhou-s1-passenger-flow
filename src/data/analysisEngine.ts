@@ -329,13 +329,17 @@ export function genPredictionData(
   filter: FilterState,
   opts?: { stationId?: string | null; segmentId?: string | null; days?: number },
 ) {
-  const days = opts?.days ?? 7
   const impact = getFactorImpact(filter.weatherFactor, filter.eventFactor)
+  const grain = filter.predictGranularity || 'day'
   const seed = hashSeed(
     'pred',
     filter.predictMethod,
     filter.predictScope,
+    grain,
     filter.dateRange.start,
+    filter.dateRange.end,
+    filter.timeRange.start,
+    filter.timeRange.end,
     filter.weatherFactor,
     filter.eventFactor,
     opts?.stationId,
@@ -357,22 +361,81 @@ export function genPredictionData(
   const actual: number[] = []
   const predicted: number[] = []
   const corrected: number[] = []
-  const start = new Date(filter.dateRange.start)
-  if (Number.isNaN(start.getTime())) start.setTime(Date.now())
 
-  for (let i = 0; i < days; i++) {
-    const d = new Date(start)
-    d.setDate(d.getDate() - (days - 1 - i))
-    dates.push(`${d.getMonth() + 1}/${d.getDate()}`)
-    const wave = 1 + Math.sin(i / 2) * 0.06
-    const truth = Math.round(base * wave * (0.96 + rnd() * 0.08))
-    actual.push(i < days - 2 ? truth : 0)
+  const end = new Date(filter.dateRange.end || filter.dateRange.start)
+  const start = new Date(filter.dateRange.start || filter.dateRange.end)
+  if (Number.isNaN(end.getTime())) end.setTime(Date.now())
+  if (Number.isNaN(start.getTime())) start.setTime(end.getTime())
+
+  type Point = { label: string; scale: number }
+  const points: Point[] = []
+
+  if (grain === 'hour') {
+    const h0 = Number((filter.timeRange.start || '06:00').slice(0, 2))
+    const h1 = Number((filter.timeRange.end || '22:00').slice(0, 2))
+    const hourBase = Math.max(80, Math.round(base / 18))
+    for (let h = h0; h <= h1; h++) {
+      const peak = h === 8 || h === 9 || h === 17 || h === 18 ? 1.55 : h >= 11 && h <= 14 ? 0.85 : 1
+      points.push({ label: `${String(h).padStart(2, '0')}:00`, scale: hourBase * peak })
+    }
+  } else if (grain === 'week') {
+    const cur = new Date(start)
+    // 对齐到周一
+    cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7))
+    const weekBase = Math.round(base * 7)
+    while (cur <= end) {
+      points.push({
+        label: `${cur.getMonth() + 1}/${cur.getDate()}`,
+        scale: weekBase * (0.92 + ((cur.getMonth() % 3) * 0.04)),
+      })
+      cur.setDate(cur.getDate() + 7)
+    }
+  } else if (grain === 'month') {
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    const endM = new Date(end.getFullYear(), end.getMonth(), 1)
+    const monthBase = Math.round(base * 30)
+    while (cur <= endM) {
+      points.push({
+        label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`,
+        scale: monthBase * (0.9 + (cur.getMonth() % 4) * 0.05),
+      })
+      cur.setMonth(cur.getMonth() + 1)
+    }
+  } else {
+    const span =
+      opts?.days ??
+      Math.max(
+        1,
+        Math.round((end.getTime() - start.getTime()) / (24 * 3600 * 1000)) + 1,
+      )
+    const capped = Math.min(span, 120)
+    const step = span > 120 ? Math.ceil(span / 120) : 1
+    for (let i = 0; i < capped; i++) {
+      const d = new Date(start)
+      d.setDate(d.getDate() + i * step)
+      if (d > end) break
+      points.push({
+        label: `${d.getMonth() + 1}/${d.getDate()}`,
+        scale: base * (1 + Math.sin(i / 3) * 0.06),
+      })
+    }
+    if (points.length === 0) {
+      points.push({ label: `${end.getMonth() + 1}/${end.getDate()}`, scale: base })
+    }
+  }
+
+  const n = points.length
+  points.forEach((p, i) => {
+    dates.push(p.label)
+    const truth = Math.round(p.scale * (0.96 + rnd() * 0.08))
+    // 末尾 1～2 点视为预测位
+    actual.push(i < n - 2 ? truth : 0)
     const err = (rnd() - 0.5) * 2 * noise
     const pred = Math.round(truth * (1 + err))
     predicted.push(pred)
     const corrBias = filter.enableCorrection ? 0.02 + rnd() * 0.04 : 0
     corrected.push(Math.round(pred * (1 + corrBias * (rnd() > 0.4 ? 1 : -0.5))))
-  }
+  })
 
   const mape = Math.round(METHOD_NOISE[filter.predictMethod] * 1000) / 10
   const tomorrow = predicted[predicted.length - 1] ?? base
@@ -383,8 +446,9 @@ export function genPredictionData(
     corrected,
     tomorrow,
     mape,
-    unit: filter.predictScope === 'line' ? '人次' : '人次',
+    unit: '人次',
     deviation: filter.enableCorrection ? Math.round((4 + rnd() * 6) * 10) / 10 : 0,
+    granularity: grain,
   }
 }
 

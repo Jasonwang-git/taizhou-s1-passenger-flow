@@ -62,6 +62,8 @@ export type DayType = 'all' | 'workday' | 'weekend' | 'holiday'
 
 export type PredictScope = 'line' | 'station' | 'section'
 
+export type PredictGranularity = 'hour' | 'day' | 'week' | 'month'
+
 export type WeatherFactor = 'none' | 'sunny' | 'rain' | 'wind' | 'hot' | 'cold'
 
 export type EventFactor = 'none' | 'holiday' | 'concert' | 'sports' | 'school'
@@ -94,6 +96,8 @@ export interface FilterState {
   predictMethod: PredictMethod
   dayType: DayType
   predictScope: PredictScope
+  /** 预测时间粒度：小时 / 日 / 周 / 月 */
+  predictGranularity: PredictGranularity
   weatherFactor: WeatherFactor
   eventFactor: EventFactor
   comparePeriod: ComparePeriod

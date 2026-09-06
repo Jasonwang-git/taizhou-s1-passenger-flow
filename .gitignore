@@ -24,3 +24,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python backend
+backend/data/parquet/
+backend/artifacts/
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# 原始大文件（本地保留，勿提交 GitHub）
+数据/*.xlsx
+数据/*.xls
+*.xlsx
+*.xls
+backend/data/json/acc_trips.json

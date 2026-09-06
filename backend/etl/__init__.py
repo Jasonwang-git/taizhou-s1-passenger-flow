@@ -1,0 +1,1 @@
+"""ETL package: Excel → Parquet."""

@@ -17,25 +17,18 @@ import {
   COMPARE_PERIODS,
   DATA_CHANNELS,
   DAY_TYPES,
-  EVENT_FACTORS,
   LINE_SEGMENTS,
-  PREDICT_METHODS,
-  PREDICT_SCOPES,
   STATIONS,
   TIME_SLOTS,
   VIEW_MODE_DESC,
   VIEW_MODE_LABELS,
-  WEATHER_FACTORS,
 } from '@/data/stations'
+import { DATA_DATE_MAX, DATA_DATE_MIN } from '@/data/dataBounds'
 import type {
   ComparePeriod,
   DataChannel,
   DayType,
-  EventFactor,
-  PredictMethod,
-  PredictScope,
   ViewMode,
-  WeatherFactor,
 } from '@/types'
 
 const NAV_ITEMS: {
@@ -69,13 +62,13 @@ export default function LeftPanel() {
   const hideS1Line = useAppStore((s) => s.hideS1Line)
   const setLoading = useAppStore((s) => s.setLoading)
   const refreshAccData = useAppStore((s) => s.refreshAccData)
+  const openPrediction = useAppStore((s) => s.openPrediction)
+  const closePrediction = useAppStore((s) => s.closePrediction)
+  const predictionOpen = useAppStore((s) => s.predictionOpen)
 
   const handleQuery = () => {
     setLoading(true)
-    setTimeout(() => {
-      refreshAccData()
-      setLoading(false)
-    }, 600)
+    void refreshAccData().finally(() => setLoading(false))
   }
 
   const suggestions = useMemo(() => {
@@ -90,16 +83,12 @@ export default function LeftPanel() {
     viewMode !== 'overview' &&
     viewMode !== 'acc-data' &&
     viewMode !== 'line-flow' &&
-    viewMode !== 'section-flow' &&
-    !(viewMode === 'prediction' && filter.predictScope === 'line')
-  const showSegmentList =
-    viewMode === 'section-flow' ||
-    (viewMode === 'prediction' && filter.predictScope === 'section')
+    viewMode !== 'section-flow'
+  const showSegmentList = viewMode === 'section-flow'
   const showDirection = viewMode === 'section-flow' || viewMode === 'imbalance'
   const showChannel = viewMode === 'acc-data' || viewMode === 'line-flow'
   const showDayType = viewMode === 'overview' || viewMode === 'line-flow' || viewMode === 'station-flow'
   const showCompare = viewMode === 'overview' || viewMode === 'line-flow'
-  const showPredictExtras = viewMode === 'prediction'
 
   const updateTimeRange = (key: 'start' | 'end', value: string) => {
     const next = { ...filter.timeRange, [key]: value }
@@ -168,7 +157,7 @@ export default function LeftPanel() {
         titleEn="FUNCTION NAV"
         extra={
           <span className="rounded-sm border border-cyan-400/40 bg-cyan-500/15 px-1.5 py-0.5 text-[9px] text-cyan-200">
-            {VIEW_MODE_LABELS[viewMode]}
+            {predictionOpen ? VIEW_MODE_LABELS.prediction : VIEW_MODE_LABELS[viewMode]}
           </span>
         }
       >
@@ -178,7 +167,8 @@ export default function LeftPanel() {
               <div className="mb-0.5 px-1 text-[9px] tracking-widest text-slate-500">{group}</div>
               <div className="space-y-0.5">
                 {NAV_ITEMS.filter((n) => n.group === group).map(({ mode, icon: Icon }) => {
-                  const active = viewMode === mode
+                  const active =
+                    mode === 'prediction' ? predictionOpen : viewMode === mode
                   return (
                     <button
                       key={mode}
@@ -188,7 +178,14 @@ export default function LeftPanel() {
                           ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-400/35'
                           : 'text-slate-400 hover:bg-cyan-500/8 hover:text-slate-200'
                       }`}
-                      onClick={() => setViewMode(mode)}
+                      onClick={() => {
+                        if (mode === 'prediction') {
+                          openPrediction()
+                        } else {
+                          closePrediction()
+                          setViewMode(mode)
+                        }
+                      }}
                     >
                       <span
                         className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-sm ${
@@ -230,17 +227,20 @@ export default function LeftPanel() {
             <div className="grid grid-cols-2 gap-1.5">
               <input
                 type="date"
-                className="input-field !py-1 !text-[11px]"
+                className="input-field !py-1 !text-[11px] [color-scheme:dark]"
                 value={filter.dateRange.start}
+                min={DATA_DATE_MIN}
+                max={DATA_DATE_MAX}
                 onChange={(e) =>
                   updateFilter({ dateRange: { ...filter.dateRange, start: e.target.value } })
                 }
               />
               <input
                 type="date"
-                className="input-field !py-1 !text-[11px]"
+                className="input-field !py-1 !text-[11px] [color-scheme:dark]"
                 value={filter.dateRange.end}
                 min={filter.dateRange.start}
+                max={DATA_DATE_MAX}
                 onChange={(e) =>
                   updateFilter({ dateRange: { ...filter.dateRange, end: e.target.value } })
                 }
@@ -347,77 +347,6 @@ export default function LeftPanel() {
                 ))}
               </div>
             </div>
-          )}
-
-          {showPredictExtras && (
-            <>
-              <div>
-                <label className="field-label !mb-0.5 !text-[10px]">预测范围</label>
-                <div className="flex gap-1">
-                  {PREDICT_SCOPES.map((s) => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      className={`chip-btn flex-1 ${filter.predictScope === s.value ? 'active' : ''}`}
-                      onClick={() => updateFilter({ predictScope: s.value as PredictScope })}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="field-label !mb-0.5 !text-[10px]">预测方法</label>
-                <select
-                  className="input-field !py-1 !text-[11px]"
-                  value={filter.predictMethod}
-                  onChange={(e) =>
-                    updateFilter({ predictMethod: e.target.value as PredictMethod })
-                  }
-                >
-                  {PREDICT_METHODS.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="field-label !mb-0.5 !text-[10px]">天气因子</label>
-                <select
-                  className="input-field !py-1 !text-[11px]"
-                  value={filter.weatherFactor}
-                  onChange={(e) =>
-                    updateFilter({ weatherFactor: e.target.value as WeatherFactor })
-                  }
-                >
-                  {WEATHER_FACTORS.map((w) => (
-                    <option key={w.value} value={w.value}>{w.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="field-label !mb-0.5 !text-[10px]">特殊事件</label>
-                <select
-                  className="input-field !py-1 !text-[11px]"
-                  value={filter.eventFactor}
-                  onChange={(e) =>
-                    updateFilter({ eventFactor: e.target.value as EventFactor })
-                  }
-                >
-                  {EVENT_FACTORS.map((ev) => (
-                    <option key={ev.value} value={ev.value}>{ev.label}</option>
-                  ))}
-                </select>
-              </div>
-              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-slate-400">
-                <input
-                  type="checkbox"
-                  className="accent-cyan-400"
-                  checked={filter.enableCorrection}
-                  onChange={(e) => updateFilter({ enableCorrection: e.target.checked })}
-                />
-                启用实时动态校正
-              </label>
-            </>
           )}
 
           {showSegmentList && (

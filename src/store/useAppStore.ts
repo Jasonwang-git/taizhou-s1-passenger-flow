@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { ViewMode, FilterState, AccRecord, Station } from '@/types'
 import { LINE_SEGMENTS, STATIONS } from '@/data/stations'
-import { genAccData } from '@/data/mockData'
+import { DEFAULT_DATE_RANGE, DEFAULT_TIME_RANGE } from '@/data/dataBounds'
+import { fetchAccRecords } from '@/api/accData'
 import { parseLineGeoJSON } from '@/utils/geojson'
 
 export type MapBasemap = 'normal' | 'satellite'
@@ -11,6 +12,16 @@ interface ToastState {
   message: string
 }
 
+interface AccDataMeta {
+  source?: string[]
+  note?: string
+  accCount?: number
+  internetCount?: number
+  loaded: boolean
+  loading: boolean
+  error?: string
+}
+
 interface AppState {
   viewMode: ViewMode
   selectedStationId: string | null
@@ -18,6 +29,7 @@ interface AppState {
   sectionSegmentId: string | null
   filter: FilterState
   accData: AccRecord[]
+  accDataMeta: AccDataMeta
   loading: boolean
   mapBasemap: MapBasemap
   leftPanelCollapsed: boolean
@@ -27,6 +39,8 @@ interface AppState {
   toast: ToastState | null
   mapLineVisible: boolean
   stationSearch: string
+  predictNonce: number
+  predictionOpen: boolean
 
   setViewMode: (mode: ViewMode) => void
   setSelectedStation: (id: string | null) => void
@@ -37,7 +51,8 @@ interface AppState {
   setMapBasemap: (basemap: MapBasemap) => void
   toggleLeftPanel: () => void
   toggleRightPanel: () => void
-  refreshAccData: () => void
+  refreshAccData: () => Promise<void>
+  loadAccData: (force?: boolean) => Promise<void>
   importAccRecords: (rows: AccRecord[], replace?: boolean) => void
   importGeoJSON: (geojson: GeoJSON.FeatureCollection) => void
   clearGeoJSON: () => void
@@ -47,9 +62,11 @@ interface AppState {
   setStationSearch: (q: string) => void
   showS1Line: () => void
   hideS1Line: () => void
+  bumpPredict: () => void
+  openPrediction: () => void
+  closePrediction: () => void
 }
 
-const today = new Date().toISOString().slice(0, 10)
 const defaultSegment = LINE_SEGMENTS[0]
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -58,20 +75,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   sectionStationIds: [defaultSegment.fromId, defaultSegment.toId],
   sectionSegmentId: defaultSegment.id,
   filter: {
-    dateRange: { start: today, end: today },
+    dateRange: { ...DEFAULT_DATE_RANGE },
     dataChannel: '',
     stationId: '',
     direction: 'down',
-    timeRange: { start: '07:00', end: '09:00' },
+    timeRange: { ...DEFAULT_TIME_RANGE },
     predictMethod: 'lstm',
     dayType: 'all',
     predictScope: 'line',
+    predictGranularity: 'day',
     weatherFactor: 'none',
     eventFactor: 'none',
     comparePeriod: 'yesterday',
     enableCorrection: true,
   },
-  accData: genAccData(),
+  accData: [],
+  accDataMeta: { loaded: false, loading: false },
   loading: false,
   mapBasemap: 'normal',
   leftPanelCollapsed: false,
@@ -81,6 +100,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   toast: null,
   mapLineVisible: true,
   stationSearch: '',
+  predictNonce: 0,
+  predictionOpen: false,
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setSelectedStation: (id) => set({ selectedStationId: id }),
@@ -134,10 +155,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMapBasemap: (basemap) => set({ mapBasemap: basemap }),
   toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
   toggleRightPanel: () => set((s) => ({ rightPanelCollapsed: !s.rightPanelCollapsed })),
-  refreshAccData: () => set({ accData: genAccData() }),
+  refreshAccData: async () => {
+    await get().loadAccData(true)
+  },
+  loadAccData: async (force = false) => {
+    const { accDataMeta } = get()
+    if (accDataMeta.loading) return
+    if (accDataMeta.loaded && !force) return
+    set({
+      accDataMeta: { ...get().accDataMeta, loading: true, error: undefined },
+    })
+    try {
+      const data = await fetchAccRecords(5000)
+      set({
+        accData: data.records,
+        accDataMeta: {
+          loaded: true,
+          loading: false,
+          source: data.source,
+          note: data.note,
+          accCount: data.accCount,
+          internetCount: data.internetCount,
+        },
+      })
+    } catch (e) {
+      set({
+        accDataMeta: {
+          ...get().accDataMeta,
+          loading: false,
+          loaded: false,
+          error: e instanceof Error ? e.message : '加载失败',
+        },
+      })
+      get().showToast(e instanceof Error ? e.message : '真实交易数据加载失败')
+    }
+  },
   importAccRecords: (rows, replace = true) =>
     set((s) => ({
       accData: replace ? rows : [...rows, ...s.accData],
+      accDataMeta: {
+        ...s.accDataMeta,
+        loaded: true,
+        note: replace ? '用户导入 CSV' : s.accDataMeta.note,
+      },
     })),
   importGeoJSON: (geojson) => {
     const parsed = parseLineGeoJSON(geojson)
@@ -165,6 +225,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().clearGeoJSON()
     set({ mapLineVisible: false })
   },
+  bumpPredict: () => set((s) => ({ predictNonce: s.predictNonce + 1 })),
+  openPrediction: () => set({ predictionOpen: true }),
+  closePrediction: () => set({ predictionOpen: false }),
 }))
 
 export function getStationById(id: string) {

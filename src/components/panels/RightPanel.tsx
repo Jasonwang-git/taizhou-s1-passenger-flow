@@ -3,31 +3,22 @@ import { useMemo } from 'react'
 import { ArrowDown, ArrowUp, Info, Lightbulb, AlertTriangle } from 'lucide-react'
 import { useAppStore, getStationName } from '@/store/useAppStore'
 import {
-  EVENT_FACTORS,
-  PREDICT_METHODS,
-  PREDICT_SCOPES,
   VIEW_MODE_LABELS,
-  WEATHER_FACTORS,
 } from '@/data/stations'
 import {
   ALERTS,
-  MODEL_COMPARE,
-  getFactorImpact,
   getStationRankData,
   getChannelShare,
   getOverviewMetrics,
   genLineFlowData,
   genOdMatrix,
   genPeakHourCompare,
-  genPeakSuggestions,
-  genPredictionData,
   genSectionRates,
   identifyMaxSection,
 } from '@/data/mockData'
 import {
   LineFlowChart,
   SectionChart,
-  PredictionChart,
   StationRankChart,
   HeatmapChart,
   GaugeChart,
@@ -38,7 +29,7 @@ import {
   PeakHourCompareChart,
   CompareTrendChart,
 } from '@/components/charts/AnalysisCharts'
-import AccDataTable from '@/components/tables/AccDataTable'
+import DataHubPanel from '@/components/data/DataHubPanel'
 import HudPanel from '@/components/ui/HudPanel'
 import type { MetricItem, ViewMode } from '@/types'
 
@@ -185,24 +176,16 @@ function ContextBar() {
       {viewMode === 'line-flow' && <span className="chip">{channelLabel}</span>}
       {selectedStationId &&
         viewMode !== 'section-flow' &&
-        viewMode !== 'line-flow' &&
-        !(viewMode === 'prediction' && filter.predictScope === 'line') && (
+        viewMode !== 'line-flow' && (
           <span className="chip chip-accent">{getStationName(selectedStationId)}</span>
         )}
-      {(viewMode === 'section-flow' ||
-        (viewMode === 'prediction' && filter.predictScope === 'section')) &&
-        sectionStationIds.length === 2 && (
-          <span className="chip chip-purple">
-            {getStationName(sectionStationIds[0])} → {getStationName(sectionStationIds[1])}
-          </span>
-        )}
+      {viewMode === 'section-flow' && sectionStationIds.length === 2 && (
+        <span className="chip chip-purple">
+          {getStationName(sectionStationIds[0])} → {getStationName(sectionStationIds[1])}
+        </span>
+      )}
       {(viewMode === 'section-flow' || viewMode === 'imbalance') && (
         <span className="chip">{filter.direction === 'up' ? '上行' : '下行'}</span>
-      )}
-      {viewMode === 'prediction' && (
-        <span className="chip chip-accent">
-          {PREDICT_SCOPES.find((s) => s.value === filter.predictScope)?.label}
-        </span>
       )}
     </div>
   )
@@ -497,203 +480,42 @@ function ImbalanceView() {
   )
 }
 
-function PredictionView() {
-  const filter = useAppStore((s) => s.filter)
-  const selectedId = useAppStore((s) => s.selectedStationId)
-  const segmentId = useAppStore((s) => s.sectionSegmentId)
-  const methodLabel =
-    PREDICT_METHODS.find((m) => m.value === filter.predictMethod)?.label ?? filter.predictMethod
-  const scopeLabel =
-    PREDICT_SCOPES.find((s) => s.value === filter.predictScope)?.label ?? filter.predictScope
-  const weatherLabel =
-    WEATHER_FACTORS.find((w) => w.value === filter.weatherFactor)?.label ?? ''
-  const eventLabel =
-    EVENT_FACTORS.find((e) => e.value === filter.eventFactor)?.label ?? ''
-  const impact = getFactorImpact(filter.weatherFactor, filter.eventFactor)
-  const impactPct = Math.round(impact.total * 100)
-  const pred = useMemo(
-    () => genPredictionData(filter, { stationId: selectedId, segmentId }),
-    [filter, selectedId, segmentId],
-  )
-  const peakPack = useMemo(() => genPeakSuggestions(filter), [filter])
-  const tomorrowLabel =
-    filter.predictScope === 'line'
-      ? (pred.tomorrow / 10000).toFixed(1)
-      : pred.tomorrow.toLocaleString()
-  const tomorrowUnit = filter.predictScope === 'line' ? '万' : '人次'
-
-  return (
-    <div className="space-y-3">
-      <KpiStrip
-        items={[
-          {
-            label: '明日预测',
-            value: tomorrowLabel,
-            unit: tomorrowUnit,
-            trend: 2.8 + impactPct / 10,
-            color: 'cyan',
-          },
-          { label: '预测精度', value: (100 - pred.mape).toFixed(1), unit: '%', trend: 0.4, color: 'green' },
-          { label: '置信区间', value: `±${pred.mape}`, unit: '%', trend: undefined, color: 'orange' },
-          {
-            label: '建议临客',
-            value: peakPack.max.loadRate > 110 ? 2 : 1,
-            unit: '列',
-            trend: undefined,
-            color: 'red',
-          },
-        ]}
-      />
-
-      {filter.enableCorrection && pred.deviation > 0 && (
-        <div className="flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200">
-          <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-          <div>
-            <div className="font-medium">
-              实时进站量较预测偏高 {pred.deviation}%，已触发动态校正
-            </div>
-            <div className="text-[10px] text-amber-400/70">校正对比见下方曲线</div>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <div className="section-label flex items-center justify-between">
-          <span>实际 vs 预测 · {scopeLabel}</span>
-          <span className="text-[10px] font-normal tracking-normal text-cyan-400/80">
-            {methodLabel}
-          </span>
-        </div>
-        <PredictionChart height={160} showCorrection={filter.enableCorrection} />
-      </div>
-
-      <InsightCard title="模型效果对比">
-        <div className="space-y-1">
-          {MODEL_COMPARE.map((m) => (
-            <div
-              key={m.method}
-              className={`flex items-center gap-2 rounded px-1.5 py-1 text-[11px] ${
-                m.method === filter.predictMethod ? 'bg-cyan-500/15 text-cyan-200' : 'text-slate-400'
-              }`}
-            >
-              <span className="w-16 truncate">{m.label}</span>
-              <span className="flex-1 text-slate-500">MAPE {m.mape}%</span>
-              <span className="font-mono text-slate-300">{m.score}</span>
-            </div>
-          ))}
-        </div>
-      </InsightCard>
-
-      <InsightCard title="天气 / 事件影响">
-        <div className="space-y-1 text-[11px] text-slate-400">
-          <div>天气：{weatherLabel}（{Math.round(impact.weather * 100)}%）</div>
-          <div>事件：{eventLabel}（{Math.round(impact.event * 100)}%）</div>
-          <div className="text-cyan-300">
-            综合修正系数 {impactPct >= 0 ? '+' : ''}
-            {impactPct}%
-          </div>
-        </div>
-      </InsightCard>
-
-      <InsightCard title="高峰期运营优化建议">
-        <ul className="space-y-2 text-[11px] text-slate-400">
-          {peakPack.suggestions.map((s) => (
-            <li key={s.title}>
-              <div className="font-medium text-slate-200">{s.title}</div>
-              <div className="leading-relaxed">{s.detail}</div>
-              <div className="text-cyan-400/80">预期：{s.effect}</div>
-            </li>
-          ))}
-        </ul>
-      </InsightCard>
-
-      <InsightCard title="预测结论">
-        <ul className="space-y-1 text-[11px] leading-relaxed text-slate-400">
-          <li>· 范围：{scopeLabel} · 方法：{methodLabel}</li>
-          <li>
-            · 明日客流预计约 {tomorrowLabel}
-            {tomorrowUnit}（已含天气/事件修正）
-          </li>
-          <li>
-            · 风险断面：{peakPack.max.from} → {peakPack.max.to}（{peakPack.max.direction}）
-          </li>
-          <li>· 建议增开 {peakPack.max.loadRate > 110 ? 2 : 1} 列临客，并启动站台限流预案</li>
-        </ul>
-      </InsightCard>
-      <AlertList levels={['info', 'warning']} />
-    </div>
-  )
-}
-
 function AccDataView() {
-  const channel = useAppStore((s) => s.filter.dataChannel)
-  const accData = useAppStore((s) => s.accData)
-  const channelLabel =
-    channel === 'acc' ? 'ACC' : channel === 'internet' ? '互联网' : '全部'
-  const filtered = useMemo(() => {
-    if (channel === 'acc') return accData.filter((r) => r.ticketName === 'ACC')
-    if (channel === 'internet') return accData.filter((r) => r.ticketName === '互联网')
-    return accData
-  }, [accData, channel])
-  const share = useMemo(() => {
-    const acc = accData.filter((r) => r.ticketName === 'ACC').length
-    if (!accData.length) return [{ name: 'ACC', value: 50 }, { name: '互联网', value: 50 }]
-    const accPct = Math.round((acc / accData.length) * 100)
-    return [
-      { name: 'ACC', value: accPct },
-      { name: '互联网', value: 100 - accPct },
-    ]
-  }, [accData])
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { label: '当前记录', value: String(filtered.length) },
-          { label: '全部记录', value: String(accData.length) },
-          { label: '当前票种', value: channelLabel },
-          { label: '覆盖站点', value: '15' },
-        ].map((x) => (
-          <div key={x.label} className="rounded-md border border-cyan-500/15 bg-slate-950/40 px-2.5 py-2">
-            <div className="text-[10px] text-slate-500">{x.label}</div>
-            <div className="font-mono text-base font-semibold text-slate-200">{x.value}</div>
-          </div>
-        ))}
-      </div>
-      <div>
-        <div className="section-label">票种占比（基于表内数据）</div>
-        <div className="mt-1 text-center text-[10px] text-slate-500">
-          {share.map((s) => `${s.name} ${s.value}%`).join(' · ')}
-        </div>
-        <ChannelPieChart height={110} />
-      </div>
-      <AccDataTable />
-    </div>
-  )
+  return <DataHubPanel />
 }
 
-const VIEWS: Record<ViewMode, () => ReactNode> = {
+const VIEWS: Record<Exclude<ViewMode, 'prediction'>, () => ReactNode> = {
   overview: OverviewView,
   'line-flow': LineFlowView,
   'section-flow': SectionFlowView,
   'station-flow': StationFlowView,
   'peak-platform': PeakPlatformView,
   imbalance: ImbalanceView,
-  prediction: PredictionView,
   'acc-data': AccDataView,
 }
 
 export default function RightPanel() {
   const viewMode = useAppStore((s) => s.viewMode)
   const loading = useAppStore((s) => s.loading)
-  const View = VIEWS[viewMode]
+  const View =
+    viewMode === 'prediction'
+      ? VIEWS.overview
+      : VIEWS[viewMode as Exclude<ViewMode, 'prediction'>] ?? VIEWS.overview
+  const panelTitle =
+    viewMode === 'prediction'
+      ? VIEW_MODE_LABELS.overview
+      : viewMode === 'acc-data'
+        ? '数据中心'
+        : VIEW_MODE_LABELS[viewMode]
+  const panelTitleEn =
+    viewMode === 'acc-data' ? 'DATA HUB · ETL BASE' : 'ANALYSIS · VISUALIZATION'
 
   return (
     <aside className="flex h-full w-full flex-col overflow-hidden">
       <HudPanel
         className="flex min-h-0 flex-1 flex-col overflow-hidden p-2.5"
-        title={VIEW_MODE_LABELS[viewMode]}
-        titleEn="ANALYSIS · VISUALIZATION"
+        title={panelTitle}
+        titleEn={panelTitleEn}
         extra={
           loading ? (
             <span className="animate-pulse text-[10px] text-cyan-400">分析中…</span>

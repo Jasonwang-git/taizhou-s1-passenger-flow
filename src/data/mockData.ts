@@ -74,6 +74,7 @@ export const CHANNEL_SHARE = getChannelShare({
   predictMethod: 'lstm',
   dayType: 'all',
   predictScope: 'line',
+  predictGranularity: 'day',
   weatherFactor: 'none',
   eventFactor: 'none',
   comparePeriod: 'yesterday',

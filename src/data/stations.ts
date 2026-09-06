@@ -69,6 +69,13 @@ export const PREDICT_SCOPES = [
   { value: 'section', label: '断面' },
 ] as const
 
+export const PREDICT_GRANULARITIES = [
+  { value: 'hour', label: '小时' },
+  { value: 'day', label: '日' },
+  { value: 'week', label: '周' },
+  { value: 'month', label: '月' },
+] as const
+
 export const WEATHER_FACTORS = [
   { value: 'none', label: '不考虑' },
   { value: 'sunny', label: '晴天' },
@@ -99,7 +106,7 @@ export const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   'peak-platform': '高峰站台',
   imbalance: '不均衡分析',
   prediction: '客流预测',
-  'acc-data': 'ACC数据',
+  'acc-data': '数据中心',
 }
 
 export const VIEW_MODE_DESC: Record<ViewMode, string> = {
@@ -110,7 +117,7 @@ export const VIEW_MODE_DESC: Record<ViewMode, string> = {
   'peak-platform': '早晚高峰站台拥挤',
   imbalance: '方向/断面/时段不均衡',
   prediction: '短时客流预测与建议',
-  'acc-data': '刷卡明细查询与导出',
+  'acc-data': '数据接入与统计底座',
 }
 
 export const LINE_INFO = {

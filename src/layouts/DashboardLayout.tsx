@@ -22,7 +22,9 @@ import { parseLineGeoJSON } from '@/utils/geojson'
 import LeftPanel from '@/components/panels/LeftPanel'
 import RightPanel from '@/components/panels/RightPanel'
 import MetroMap from '@/components/map/MetroMap'
+import MapBasemapControls from '@/components/map/MapBasemapControls'
 import BootSplash from '@/components/ui/BootSplash'
+import PredictionModal from '@/components/prediction/PredictionModal'
 import type { ViewMode } from '@/types'
 
 const BOTTOM_TABS: {
@@ -38,7 +40,7 @@ const BOTTOM_TABS: {
     modes: ['line-flow', 'section-flow', 'station-flow', 'peak-platform', 'imbalance'],
     defaultMode: 'line-flow',
   },
-  { id: 'prediction', label: '客流预测', modes: ['prediction'], defaultMode: 'prediction' },
+  { id: 'prediction', label: '客流预测', modes: [] as ViewMode[], defaultMode: 'overview' as ViewMode },
   { id: 'data', label: '数据中心', modes: ['acc-data'], defaultMode: 'acc-data' },
 ]
 
@@ -48,6 +50,9 @@ export default function DashboardLayout() {
   const leftCollapsed = useAppStore((s) => s.leftPanelCollapsed)
   const rightCollapsed = useAppStore((s) => s.rightPanelCollapsed)
   const viewMode = useAppStore((s) => s.viewMode)
+  const predictionOpen = useAppStore((s) => s.predictionOpen)
+  const openPrediction = useAppStore((s) => s.openPrediction)
+  const closePrediction = useAppStore((s) => s.closePrediction)
   const toggleLeft = useAppStore((s) => s.toggleLeftPanel)
   const toggleRight = useAppStore((s) => s.toggleRightPanel)
   const setViewMode = useAppStore((s) => s.setViewMode)
@@ -62,10 +67,10 @@ export default function DashboardLayout() {
     return () => clearInterval(timer)
   }, [])
 
-  const activeTab = useMemo(
-    () => BOTTOM_TABS.find((t) => t.modes.includes(viewMode))?.id ?? 'overview',
-    [viewMode],
-  )
+  const activeTab = useMemo(() => {
+    if (predictionOpen) return 'prediction'
+    return BOTTOM_TABS.find((t) => t.modes.includes(viewMode))?.id ?? 'overview'
+  }, [viewMode, predictionOpen])
 
   const handleImportGeoJSON = () => {
     const input = document.createElement('input')
@@ -93,6 +98,7 @@ export default function DashboardLayout() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-hud-grid">
       <BootSplash visible={!appReady} />
+      <PredictionModal />
 
       {/* 地图始终挂载以便后台加载；界面与地图就绪后一起淡入 */}
       <div className="absolute inset-0 z-0">
@@ -101,8 +107,8 @@ export default function DashboardLayout() {
       </div>
 
       <div
-        className={`relative z-20 flex h-full flex-col transition-opacity duration-500 ${
-          appReady ? 'opacity-100' : 'pointer-events-none opacity-0'
+        className={`pointer-events-none relative z-20 flex h-full flex-col transition-opacity duration-500 ${
+          appReady ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* 顶栏：仅标题行，KPI 绝对浮在下方，不占左右栏高度 */}
@@ -209,6 +215,8 @@ export default function DashboardLayout() {
           </button>
         </div>
 
+        {appReady && <MapBasemapControls />}
+
         <div className="relative z-30 flex h-10 flex-shrink-0 items-end justify-center pb-0.5">
           <div className="bottom-nav">
             {BOTTOM_TABS.map((tab) => (
@@ -216,7 +224,14 @@ export default function DashboardLayout() {
                 key={tab.id}
                 type="button"
                 className={`bottom-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setViewMode(tab.defaultMode)}
+                onClick={() => {
+                  if (tab.id === 'prediction') {
+                    openPrediction()
+                  } else {
+                    closePrediction()
+                    setViewMode(tab.defaultMode)
+                  }
+                }}
               >
                 {tab.id === 'prediction' && (
                   <TrendingUp size={11} className="mr-1 inline-block opacity-80" />

@@ -8,7 +8,8 @@
     "convert-shp": "python scripts/convert_s1_shp.py",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": "cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
